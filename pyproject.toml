@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloud-product-analytics"
+version = "1.0.0"
+description = "Product analytics pipeline (ETL, KPI library, reporting) for a B2B cloud platform, built with PySpark and SQL."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Akshitaa Vijayakumar" }]
+license = { text = "MIT" }
+dependencies = [
+    "pyspark>=4.0,<4.2",
+    "pyarrow>=15",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

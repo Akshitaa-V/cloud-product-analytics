@@ -1,0 +1,109 @@
+// Power BI measures for the product analytics model.
+//
+// How to add them all at once (Power BI Desktop, 2024 or newer):
+//   1. Open DAX query view (left sidebar).
+//   2. Paste this whole file and press Run.
+//   3. Click "Update model: Add new measures" above the DEFINE block.
+// Every measure is listed in kpis/kpi_library.yml next to the KPI it shows.
+
+DEFINE
+    // ---------- Engagement ----------
+    MEASURE fact_user_daily[Active Users] =
+        DISTINCTCOUNT ( fact_user_daily[user_id] )
+
+    MEASURE fact_user_daily[WAU (7d)] =
+        CALCULATE (
+            [Active Users],
+            DATESINPERIOD ( dim_date[date], MAX ( dim_date[date] ), -7, DAY )
+        )
+
+    MEASURE fact_user_daily[MAU (28d)] =
+        CALCULATE (
+            [Active Users],
+            DATESINPERIOD ( dim_date[date], MAX ( dim_date[date] ), -28, DAY )
+        )
+
+    MEASURE fact_user_daily[Stickiness (28d)] =
+        VAR AvgDau =
+            CALCULATE (
+                AVERAGEX ( VALUES ( dim_date[date] ), [Active Users] ),
+                DATESINPERIOD ( dim_date[date], MAX ( dim_date[date] ), -28, DAY )
+            )
+        RETURN
+            DIVIDE ( AvgDau, [MAU (28d)] )
+
+    // ---------- Activation and retention ----------
+    MEASURE dim_user[New Users] =
+        CALCULATE (
+            COUNTROWS ( dim_user ),
+            dim_user[is_new_in_window] = TRUE (),
+            dim_user[activation_window_complete] = TRUE ()
+        )
+
+    MEASURE dim_user[Activated Users] =
+        CALCULATE ( [New Users], dim_user[is_activated] = TRUE () )
+
+    MEASURE dim_user[Activation Rate] =
+        DIVIDE ( [Activated Users], [New Users] )
+
+    MEASURE kpi_retention_weekly[Retention Rate] =
+        DIVIDE (
+            SUM ( kpi_retention_weekly[retained_users] ),
+            SUM ( kpi_retention_weekly[cohort_size] )
+        )
+
+    // ---------- Features ----------
+    MEASURE kpi_feature_adoption[Feature Adoption Rate] =
+        DIVIDE (
+            SUM ( kpi_feature_adoption[adopting_accounts] ),
+            SUM ( kpi_feature_adoption[active_accounts] )
+        )
+
+    // ---------- Upload pipeline ----------
+    MEASURE fact_events[Uploads] =
+        CALCULATE ( COUNTROWS ( fact_events ), fact_events[event_name] = "dataset_upload" )
+
+    MEASURE fact_events[Processing Jobs] =
+        CALCULATE (
+            COUNTROWS ( fact_events ),
+            fact_events[event_name] IN { "dataset_processed", "dataset_processing_failed" }
+        )
+
+    MEASURE fact_events[Median Processing (min)] =
+        DIVIDE (
+            CALCULATE ( MEDIAN ( fact_events[duration_s] ), fact_events[event_name] = "dataset_processed" ),
+            60
+        )
+
+    MEASURE fact_events[Processing Failure Rate] =
+        DIVIDE (
+            CALCULATE ( COUNTROWS ( fact_events ), fact_events[event_name] = "dataset_processing_failed" ),
+            [Processing Jobs]
+        )
+
+    MEASURE kpi_upload_funnel[Upload to Share Rate] =
+        DIVIDE ( SUM ( kpi_upload_funnel[shared] ), SUM ( kpi_upload_funnel[uploaded] ) )
+
+    // ---------- Account health ----------
+    MEASURE kpi_account_health[Seat Utilization] =
+        DIVIDE ( SUM ( kpi_account_health[active_users] ), SUM ( kpi_account_health[seats] ) )
+
+    MEASURE kpi_account_health[At-Risk Accounts] =
+        CALCULATE (
+            DISTINCTCOUNT ( kpi_account_health[account_id] ),
+            kpi_account_health[health_status] = "at_risk"
+        )
+
+EVALUATE
+    ROW (
+        "Active Users", [Active Users],
+        "MAU (28d)", [MAU (28d)],
+        "Stickiness (28d)", [Stickiness (28d)],
+        "Activation Rate", [Activation Rate],
+        "Retention Rate", [Retention Rate],
+        "Uploads", [Uploads],
+        "Median Processing (min)", [Median Processing (min)],
+        "Processing Failure Rate", [Processing Failure Rate],
+        "Upload to Share Rate", [Upload to Share Rate],
+        "Seat Utilization", [Seat Utilization]
+    )
